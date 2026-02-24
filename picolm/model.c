@@ -237,7 +237,7 @@ static int parse_gguf(model_t *m, int max_seq_len) {
         if (str_eq(key, "general.architecture")) {
             if (vtype == GGUF_META_STRING) {
                 gguf_str_t arch_str = read_gguf_string(&r);
-                if (str_eq(arch_str, "gemma") || str_eq(arch_str, "gemma2")) {
+                if (str_eq(arch_str, "gemma") || str_eq(arch_str, "gemma2") || str_eq(arch_str, "gemma3")) {
                     cfg->arch = ARCH_GEMMA;
                 } else {
                     cfg->arch = ARCH_LLAMA;
