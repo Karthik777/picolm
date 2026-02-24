@@ -14,7 +14,7 @@ Thanks for your interest in PicoLLM! This project is intentionally small (~2,500
 ### High Impact
 - **SIMD kernels** — AVX2/AVX-512 for x86, optimized NEON for ARM
 - **New quantization formats** — Q5_K fused dot product, IQ formats
-- **New model architectures** — Mistral, Phi, Gemma (LLaMA-compatible)
+- **New model architectures** — Mistral, Phi (Gemma is now supported!)
 - **Platform testing** — RISC-V boards, Pi Zero, exotic ARM SBCs
 
 ### Medium Impact

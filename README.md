@@ -145,7 +145,7 @@ picoclaw agent -m "Search for weather in Tokyo"
 
 ## What is PicoLM?
 
-PicoLM is a **minimal, from-scratch LLM inference engine** written in ~2,500 lines of C11. It runs [TinyLlama 1.1B](https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0) (and other LLaMA-architecture models in GGUF format) on hardware that most inference frameworks won't even consider:
+PicoLM is a **minimal, from-scratch LLM inference engine** written in ~2,500 lines of C11. It runs [TinyLlama 1.1B](https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0) and other LLaMA/Gemma-architecture models in GGUF format on hardware that most inference frameworks won't even consider:
 
 - **Raspberry Pi Zero 2W** ($15, 512MB RAM, ARM Cortex-A53)
 - **Sipeed LicheeRV** ($12, 512MB RAM, RISC-V)
@@ -513,15 +513,24 @@ The `--json` mode pre-analyzes every token in the vocabulary at load time (brace
 
 ## Supported Models
 
-PicoLM supports any LLaMA-architecture model in GGUF format:
+PicoLM supports LLaMA-architecture and Gemma-architecture models in GGUF format:
 
 | Model | Parameters | GGUF Size (Q4_K_M) | RAM Needed |
 |-------|-----------|---------------------|------------|
 | **TinyLlama 1.1B** | 1.1B | 638 MB | ~45 MB |
 | **Llama 2 7B** | 7B | 4.1 GB | ~200 MB |
 | **Phi-2** | 2.7B | 1.6 GB | ~90 MB |
+| **Gemma 2B** | 2B | 1.2 GB | ~70 MB |
+| **Gemma 7B** | 7B | 4.3 GB | ~210 MB |
 
 > **Recommended for embedded:** TinyLlama 1.1B Q4_K_M — fits comfortably on devices with 256MB+ RAM.
+
+### Supported architectures
+
+- **LLaMA** (LLaMA 1, LLaMA 2, TinyLlama, Phi, etc.) — Uses SiLU activation in SwiGLU FFN
+- **Gemma** (Gemma, Gemma 2, Gemma 3, etc.) — Uses GELU activation in GeGLU FFN
+
+The architecture is automatically detected from GGUF metadata (`general.architecture` field).
 
 ### Supported quantization formats
 
@@ -639,12 +648,13 @@ A: TinyLlama 1.1B is a small model — it handles simple tasks (Q&A, summarizati
 A: PicoLM is CPU-only by design. The target hardware ($10-15 boards) doesn't have GPUs. On x86/ARM CPUs, SIMD (NEON/SSE2) provides meaningful speedup.
 
 **Q: Can I use a different model?**
-A: Any LLaMA-architecture GGUF model works. Download from [HuggingFace](https://huggingface.co/models?search=gguf) and point PicoLM at it. Recommended quantizations: Q4_K_M (best quality/size balance) or Q2_K (smallest, lower quality).
+A: Any LLaMA or Gemma-architecture GGUF model works. Download from [HuggingFace](https://huggingface.co/models?search=gguf) and point PicoLM at it. Recommended quantizations: Q4_K_M (best quality/size balance) or Q2_K (smallest, lower quality).
 
 ---
 
 ## Roadmap
 
+- [x] **Gemma architecture support** — GeGLU FFN with GELU activation
 - [ ] AVX2/AVX-512 kernels for x86 (2-4x generation speed on modern CPUs)
 - [ ] Speculative decoding with a draft model
 - [ ] Context sliding window (infinite generation beyond max_seq_len)

@@ -35,6 +35,9 @@ void rope(float *q, float *k, int head_dim, int n_heads, int n_kv_heads,
 /* In-place SiLU: x[i] = x[i] / (1 + exp(-x[i])) */
 void silu(float *x, int size);
 
+/* In-place GELU: x[i] = 0.5 * x[i] * (1 + tanh(sqrt(2/pi) * (x[i] + 0.044715 * x[i]**3))) */
+void gelu(float *x, int size);
+
 /* Element-wise multiply: out[i] = a[i] * b[i] */
 void elemwise_mul(float *out, const float *a, const float *b, int size);
 
