@@ -225,6 +225,7 @@ static int parse_gguf(model_t *m, int max_seq_len) {
     cfg->rope_freq_base = 10000.0f;
     cfg->max_seq_len = 2048;
     cfg->weight_type = GGUF_TYPE_F16;
+    cfg->arch = ARCH_LLAMA;  /* default to LLaMA architecture */
     m->tok_bos_id = 1;
     m->tok_eos_id = 2;
 
@@ -232,19 +233,34 @@ static int parse_gguf(model_t *m, int max_seq_len) {
         gguf_str_t key = read_gguf_string(&r);
         uint32_t vtype = read_u32(&r);
 
-        if (str_eq(key, "llama.embedding_length") || str_eq(key, "general.embedding_length")) {
+        /* Architecture detection */
+        if (str_eq(key, "general.architecture")) {
+            if (vtype == GGUF_META_STRING) {
+                gguf_str_t arch_str = read_gguf_string(&r);
+                if (str_eq(arch_str, "gemma") || str_eq(arch_str, "gemma2")) {
+                    cfg->arch = ARCH_GEMMA;
+                } else {
+                    cfg->arch = ARCH_LLAMA;
+                }
+            } else {
+                int dummy; skip_meta_value(&r, vtype, &dummy);
+            }
+        /* Model parameters (support both llama.* and gemma.* prefixes) */
+        } else if (str_eq(key, "llama.embedding_length") || str_eq(key, "gemma.embedding_length") || 
+                   str_eq(key, "general.embedding_length")) {
             int dummy; cfg->n_embd = (int)skip_meta_value(&r, vtype, &dummy);
-        } else if (str_eq(key, "llama.feed_forward_length") || str_eq(key, "general.feed_forward_length")) {
+        } else if (str_eq(key, "llama.feed_forward_length") || str_eq(key, "gemma.feed_forward_length") || 
+                   str_eq(key, "general.feed_forward_length")) {
             int dummy; cfg->n_ffn = (int)skip_meta_value(&r, vtype, &dummy);
-        } else if (str_eq(key, "llama.attention.head_count")) {
+        } else if (str_eq(key, "llama.attention.head_count") || str_eq(key, "gemma.attention.head_count")) {
             int dummy; cfg->n_heads = (int)skip_meta_value(&r, vtype, &dummy);
-        } else if (str_eq(key, "llama.attention.head_count_kv")) {
+        } else if (str_eq(key, "llama.attention.head_count_kv") || str_eq(key, "gemma.attention.head_count_kv")) {
             int dummy; cfg->n_kv_heads = (int)skip_meta_value(&r, vtype, &dummy);
-        } else if (str_eq(key, "llama.block_count")) {
+        } else if (str_eq(key, "llama.block_count") || str_eq(key, "gemma.block_count")) {
             int dummy; cfg->n_layers = (int)skip_meta_value(&r, vtype, &dummy);
-        } else if (str_eq(key, "llama.context_length")) {
+        } else if (str_eq(key, "llama.context_length") || str_eq(key, "gemma.context_length")) {
             int dummy; cfg->max_seq_len = (int)skip_meta_value(&r, vtype, &dummy);
-        } else if (str_eq(key, "llama.rope.freq_base")) {
+        } else if (str_eq(key, "llama.rope.freq_base") || str_eq(key, "gemma.rope.freq_base")) {
             if (vtype == GGUF_META_FLOAT32) {
                 cfg->rope_freq_base = read_f32(&r);
             } else {
@@ -252,7 +268,7 @@ static int parse_gguf(model_t *m, int max_seq_len) {
             }
         } else if (str_eq(key, "general.alignment")) {
             int dummy; cfg->alignment = (int)skip_meta_value(&r, vtype, &dummy);
-        } else if (str_eq(key, "llama.vocab_size")) {
+        } else if (str_eq(key, "llama.vocab_size") || str_eq(key, "gemma.vocab_size")) {
             int dummy; cfg->vocab_size = (int)skip_meta_value(&r, vtype, &dummy);
         } else if (str_eq(key, "tokenizer.ggml.bos_token_id")) {
             int dummy; m->tok_bos_id = (uint32_t)skip_meta_value(&r, vtype, &dummy);
@@ -401,6 +417,7 @@ static int parse_gguf(model_t *m, int max_seq_len) {
     cfg->weight_type = w->layers[0].type_attn_q;
 
     fprintf(stderr, "Model config:\n");
+    fprintf(stderr, "  architecture=%s\n", cfg->arch == ARCH_GEMMA ? "Gemma" : "LLaMA");
     fprintf(stderr, "  n_embd=%d, n_ffn=%d, n_heads=%d, n_kv_heads=%d\n",
             cfg->n_embd, cfg->n_ffn, cfg->n_heads, cfg->n_kv_heads);
     fprintf(stderr, "  n_layers=%d, vocab_size=%d, max_seq=%d\n",
@@ -683,13 +700,18 @@ float *model_forward(model_t *m, int token, int pos) {
         matmul(s->xb2, s->xb, lw->attn_output, dim, dim, lw->type_attn_output);
         vec_add(s->x, s->xb2, dim);
 
-        /* ---- FFN (SwiGLU) ---- */
+        /* ---- FFN (SwiGLU for LLaMA, GeGLU for Gemma) ---- */
         rmsnorm(s->xb, s->x, s->ffn_norm_w[l], dim);
 
         matmul(s->hb,  s->xb, lw->ffn_gate, dim, n_ffn, lw->type_ffn_gate);
         matmul(s->hb2, s->xb, lw->ffn_up,   dim, n_ffn, lw->type_ffn_up);
 
-        silu(s->hb, n_ffn);
+        /* Use GELU for Gemma, SiLU for LLaMA */
+        if (c->arch == ARCH_GEMMA) {
+            gelu(s->hb, n_ffn);
+        } else {
+            silu(s->hb, n_ffn);
+        }
         elemwise_mul(s->hb, s->hb, s->hb2, n_ffn);
 
         matmul(s->xb, s->hb, lw->ffn_down, n_ffn, dim, lw->type_ffn_down);

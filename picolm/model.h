@@ -13,6 +13,11 @@
 
 /* ---- Configuration ---- */
 
+typedef enum {
+    ARCH_LLAMA = 0,
+    ARCH_GEMMA = 1,
+} model_arch_t;
+
 typedef struct {
     int n_embd;         /* embedding dimension (e.g. 2048) */
     int n_ffn;          /* feed-forward hidden size (e.g. 5632) */
@@ -25,6 +30,7 @@ typedef struct {
     float rope_freq_base; /* RoPE theta base (e.g. 10000.0) */
     int alignment;      /* GGUF data alignment */
     gguf_type_t weight_type; /* default weight quantization type */
+    model_arch_t arch;  /* model architecture type (LLaMA, Gemma, etc.) */
 } model_config_t;
 
 /* ---- Per-layer weight pointers (into mmap) ---- */
